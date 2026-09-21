@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OpenRouter Prompt Lab</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/vendor/chart.umd.js" defer></script>
+  <script src="/app.js" type="module"></script>
+</head>
+<body>
+  <main>
+    <header>
+      <span class="eyebrow">UN PEQUEÑO LABORATORIO DE IA</span>
+      <h1>OpenRouter <span>Prompt Lab</span></h1>
+      <p>Compara respuestas, descubre los tokens y explora el costo de una clase con IA.</p>
+    </header>
+
+    <div class="workspace">
+      <section class="card" aria-labelledby="prompt-title">
+        <h2 id="prompt-title">Tu experimento</h2>
+        <form id="prompt-form">
+          <label for="task">¿Qué quieres hacer?</label>
+          <select id="task" name="task">
+            <option value="libre">Prompt libre</option>
+            <option value="explicar">Explicar</option>
+            <option value="cuestionario">Generar cuestionario</option>
+            <option value="mejorar">Mejorar texto</option>
+          </select>
+          <label for="prompt">Escribe tu prompt</label>
+          <textarea id="prompt" name="prompt" rows="10" maxlength="10000" required placeholder="Por ejemplo: ¿Cómo funciona una API?" aria-describedby="prompt-help"></textarea>
+          <p class="hint" id="prompt-help">Incluye el tema, el contexto y el resultado que esperas. Máximo 10.000 caracteres.</p>
+          <fieldset><legend>Modelos · elige de uno a tres</legend>
+            <label for="model-search">Buscar por nombre o identificador</label>
+            <input id="model-search" type="search" placeholder="Buscar modelos…">
+            <p id="catalog-status" class="hint" role="status">Cargando catálogo…</p>
+            <div id="model-selector"></div>
+          </fieldset>
+          <details><summary>Opciones avanzadas</summary>
+            <label for="system-prompt">System prompt adicional</label>
+            <textarea id="system-prompt" rows="3" maxlength="4000" placeholder="Instrucciones comunes para todos los modelos"></textarea>
+            <label class="check"><input id="allow-paid" type="checkbox"> Autorizo modelos pagados en esta ejecución</label>
+            <p id="paid-help" class="hint"></p>
+          </details>
+          <p id="request-count" role="status">Esta comparación realizará 0 solicitudes a OpenRouter.</p>
+          <button id="generate" disabled type="submit">Generar <span aria-hidden="true">↗</span></button>
+          <p id="status" role="status" aria-live="polite"></p>
+          <p id="error" class="error" role="alert" hidden></p>
+        </form>
+      </section>
+
+      <section class="card result-card" aria-labelledby="response-title" id="result" aria-busy="false">
+        <div class="result-heading"><h2 id="response-title">Respuestas</h2><span class="badge">OpenRouter</span></div>
+        <button id="clear-results" type="button" class="secondary">Limpiar resultados</button>
+        <div id="answers"><p class="placeholder">Tu próxima idea empieza aquí. Elige un modelo y pulsa Generar.</p></div>
+      </section>
+    </div>
+    <section id="analysis" class="card section" hidden>
+      <h2>Métricas y simulador de costos</h2>
+      <div class="simulation-grid">
+        <div><label for="price-source">Precios para la simulación</label><select id="price-source"><option value="used">Modelo utilizado (respaldo al solicitado)</option><option value="catalog">Otro modelo del catálogo</option><option value="manual">Precios hipotéticos comunes</option></select></div>
+        <div id="catalog-price-fields" hidden><label for="price-model">Modelo de referencia (sin generar)</label><select id="price-model"></select></div>
+        <div id="manual-price-fields" hidden>
+          <label for="input-price">Entrada · USD por millón</label><input id="input-price" type="number" min="0" step="any" value="1">
+          <label for="output-price">Salida · USD por millón</label><input id="output-price" type="number" min="0" step="any" value="3">
+        </div>
+        <div><label for="requests">Número de solicitudes</label><input id="requests" type="number" min="1" step="1" value="100"></div>
+        <div><label for="students">Estudiantes</label><input id="students" type="number" min="1" step="1" value="30"></div>
+        <div><label for="per-student">Solicitudes por estudiante</label><input id="per-student" type="number" min="1" step="1" value="10"></div>
+      </div>
+      <p class="hint">Estimación = (tokens de entrada × precio de entrada + tokens de salida × precio de salida) / 1.000.000. No se suman otra vez caché ni razonamiento. Esta estimación simple no reproduce descuentos, tarifas adicionales ni variaciones por proveedor. Consultar precios no genera llamadas a modelos.</p>
+      <p id="simulation-error" class="error" role="alert" hidden></p><p id="projection" role="status"></p>
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Tabla equivalente a los gráficos"><table><caption>Resultados y precios por llamada · No disponible significa dato desconocido</caption><thead><tr id="metric-head"></tr></thead><tbody id="metric-body"></tbody></table></div>
+      <p id="zero-cost" class="hint" hidden>Todos los costos reales reportados son cero.</p>
+      <p class="hint">El razonamiento se resta de salida solo si el desglose es válido. La caché ya forma parte de entrada. Se omiten datos desconocidos; una respuesta fallida puede tener consumo. La latencia incluye las llamadas terminadas con error.</p>
+      <div class="chart-grid">
+        <div class="chart"><canvas id="tokens-chart" role="img" aria-label="Tokens de entrada, salida y razonamiento; datos en la tabla anterior"></canvas></div>
+        <div class="chart"><canvas id="latency-chart" role="img" aria-label="Latencia por modelo en milisegundos; datos en la tabla anterior"></canvas></div>
+        <div class="chart"><canvas id="costs-chart" role="img" aria-label="Costos reales y estimados en USD; datos en la tabla anterior"></canvas></div>
+      </div>
+    </section>
+    <section class="card section"><h2>Historial de esta pestaña</h2><p class="hint">Hasta diez comparaciones. Recuperar no envía solicitudes. Los acumulados incluyen toda la sesión y las estimaciones guardadas al ejecutar; cambiar el simulador no los modifica. Recargar inicia una sesión nueva.</p><p id="totals" role="status"></p><div id="history"></div><button type="button" id="reset-history" class="secondary">Eliminar historial y reiniciar acumulados</button></section>
+    <section class="card section"><h2>Aprender a leer las métricas</h2>
+      <dl class="education"><dt>Token</dt><dd>Fragmento de texto que procesa un modelo; no equivale necesariamente a una palabra.</dd>
+      <dt>Entrada y salida</dt><dd>Entrada incluye instrucciones y prompt; salida es lo generado, incluido razonamiento cuando se reporta dentro de ella.</dd>
+      <dt>Razonamiento y caché</dt><dd>Razonamiento son tokens de procesamiento interno reportados. Caché indica entrada reutilizada; escritura de caché indica tokens guardados. No son tokens adicionales que deban sumarse al total.</dd>
+      <dt>Contexto</dt><dd>Capacidad de tokens que puede manejar el modelo en una conversación; no garantiza la longitud máxima de salida.</dd>
+      <dt>Latencia y costo real</dt><dd>Latencia es el tiempo de la llamada en el servidor, sin el viaje al navegador. Costo real es exclusivamente usage.cost reportado por OpenRouter. Un error no garantiza consumo cero.</dd>
+      <dt>Una solicitud</dt><dd>Una llamada a un modelo. Comparar tres modelos implica tres solicitudes.</dd></dl>
+      <p><strong>Los modelos pueden usar tokenizadores diferentes, por lo que el mismo texto puede producir distintas cantidades de tokens.</strong></p>
+    </section>
+    <footer>Una solicitud, un experimento. Cada generación empieza una conversación nueva.</footer>
+  </main>
+</body>
+</html>
